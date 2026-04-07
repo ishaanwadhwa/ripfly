@@ -6,8 +6,8 @@ import { eq, desc } from "drizzle-orm";
 import { Navbar } from "@/components/navbar";
 import { FlightCard, getClaimDeadline } from "@/components/flight-card";
 import { ScanButton } from "@/components/scan-button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { AutoScan } from "@/components/auto-scan";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -92,21 +92,8 @@ export default async function DashboardPage() {
             </div>
           )}
 
-          {/* Empty state */}
-          {userFlights.length === 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>No flights found yet</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  We scan your email for booking confirmations and show flights
-                  eligible for miles. Click &quot;Find More Miles&quot; to get
-                  started.
-                </p>
-              </CardContent>
-            </Card>
-          )}
+          {/* Empty state — auto-scan on first visit */}
+          {userFlights.length === 0 && <AutoScan />}
         </div>
       </main>
     </>

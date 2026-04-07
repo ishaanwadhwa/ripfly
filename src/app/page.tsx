@@ -238,6 +238,11 @@ export default async function Home() {
           </p>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="px-4 sm:px-6 py-6 border-t text-center text-xs text-muted-foreground">
+        Built by Ishaan &middot; {new Date().getFullYear()}
+      </footer>
     </main>
   );
 }

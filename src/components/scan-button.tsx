@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
 export function ScanButton() {
   const [isScanning, setIsScanning] = useState(false);
@@ -39,6 +40,7 @@ export function ScanButton() {
   return (
     <div className="flex items-center gap-3">
       <Button onClick={handleScan} disabled={isScanning}>
+        {isScanning && <Loader2 className="animate-spin" />}
         {isScanning ? "Scanning..." : "Find More Miles"}
       </Button>
       {result && (
