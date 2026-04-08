@@ -68,7 +68,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { claimId, status, notes } = await req.json();
+  const { claimId, status, notes, rejectionReason } = await req.json();
   if (!claimId || !status) {
     return NextResponse.json(
       { error: "claimId and status are required" },
@@ -106,6 +106,12 @@ export async function PATCH(req: NextRequest) {
     updatedAt: new Date(),
   };
   if (notes !== undefined) updates.notes = notes;
+  if (status === "rejected" && rejectionReason) updates.rejectionReason = rejectionReason;
+  if (status === "initiated") {
+    updates.rejectionReason = null;
+    updates.resolvedAt = null;
+    updates.submittedAt = null;
+  }
   if (status === "submitted") updates.submittedAt = new Date();
   if (status === "credited" || status === "rejected")
     updates.resolvedAt = new Date();

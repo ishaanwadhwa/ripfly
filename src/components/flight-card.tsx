@@ -56,13 +56,15 @@ function formatDate(dateStr: string) {
   });
 }
 
-export function FlightCard({ flight }: { flight: Flight }) {
+export function FlightCard({ flight, claimStatus }: { flight: Flight; claimStatus?: string | null }) {
   const { daysRemaining, urgency } = getClaimDeadline(flight);
   const isEligible = urgency !== "expired";
+  const isRejected = claimStatus === "rejected";
+  const isCredited = claimStatus === "credited";
 
   return (
     <Link href={`/flights/${flight.id}`} className="block">
-    <Card className={`${!isEligible ? "opacity-60" : ""} hover:border-foreground/20 transition-colors`}>
+    <Card className={`${!isEligible && !isRejected && !isCredited ? "opacity-60" : ""} hover:border-foreground/20 transition-colors`}>
       <CardHeader>
         <div>
           <CardTitle className="text-base">
@@ -92,9 +94,19 @@ export function FlightCard({ flight }: { flight: Flight }) {
           )}
         </div>
         <CardAction>
-          <Badge variant="outline" className={urgencyStyles[urgency]}>
-            {urgencyLabel(daysRemaining, urgency)}
-          </Badge>
+          {isCredited ? (
+            <Badge variant="outline" className="bg-green-100 text-green-800">
+              Miles Credited
+            </Badge>
+          ) : isRejected ? (
+            <Badge variant="outline" className="bg-red-100 text-red-800">
+              Rejected
+            </Badge>
+          ) : (
+            <Badge variant="outline" className={urgencyStyles[urgency]}>
+              {urgencyLabel(daysRemaining, urgency)}
+            </Badge>
+          )}
         </CardAction>
       </CardHeader>
       <CardContent>
@@ -106,12 +118,23 @@ export function FlightCard({ flight }: { flight: Flight }) {
             {flight.passengerName && (
               <span>{flight.passengerName}</span>
             )}
+            {flight.sourceEmail && (
+              <span className="text-xs">via {flight.sourceEmail}</span>
+            )}
           </div>
-          {isEligible && (
+          {isCredited ? (
+            <span className="text-sm font-medium text-green-700">
+              Claimed
+            </span>
+          ) : isRejected && isEligible ? (
+            <span className="text-sm font-medium text-primary">
+              Retry &rarr;
+            </span>
+          ) : isEligible && !isRejected ? (
             <span className="text-sm font-medium text-primary">
               Claim Miles &rarr;
             </span>
-          )}
+          ) : null}
         </div>
       </CardContent>
     </Card>

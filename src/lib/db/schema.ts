@@ -86,6 +86,7 @@ export const flights = pgTable(
     claimWindowDays: integer("claim_window_days").default(90).notNull(),
     status: varchar("status", { length: 20 }).default("detected").notNull(),
     emailMessageId: varchar("email_message_id", { length: 255 }),
+    sourceEmail: varchar("source_email", { length: 255 }),
     rawExtracted: jsonb("raw_extracted"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -105,6 +106,7 @@ export const claims = pgTable("claims", {
     .notNull(),
   method: varchar("method", { length: 20 }).default("guided").notNull(),
   status: varchar("status", { length: 20 }).default("initiated").notNull(),
+  rejectionReason: varchar("rejection_reason", { length: 50 }),
   airlineClaimRef: varchar("airline_claim_ref", { length: 100 }),
   notes: text("notes"),
   initiatedAt: timestamp("initiated_at").defaultNow().notNull(),
@@ -113,6 +115,28 @@ export const claims = pgTable("claims", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export const linkedAccounts = pgTable(
+  "linked_accounts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    email: varchar("email", { length: 255 }).notNull(),
+    googleAccountId: varchar("google_account_id", { length: 255 }).notNull(),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    expiresAt: integer("expires_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("linked_accounts_user_google_idx").on(
+      table.userId,
+      table.googleAccountId
+    ),
+  ]
+);
 
 export const reminders = pgTable("reminders", {
   id: uuid("id").defaultRandom().primaryKey(),

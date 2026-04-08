@@ -2,9 +2,17 @@ import { google, type gmail_v1 } from "googleapis";
 import { OAuth2Client } from "google-auth-library";
 import { eq, and } from "drizzle-orm";
 import { createDb } from "@/lib/db";
-import { accounts } from "@/lib/db/schema";
+import { accounts, linkedAccounts } from "@/lib/db/schema";
 
-// ─── Token retrieval & refresh ──────────────────────────────────────
+// ─── Types ─────────────────────────────────────────────────────────
+
+export interface GmailAccount {
+  gmail: gmail_v1.Gmail;
+  email: string;
+  source: "primary" | "linked";
+}
+
+// ─── Single client (backward compat for cron etc.) ─────────────────
 
 export async function getGmailClient(userId: string) {
   const db = createDb();
@@ -45,12 +53,126 @@ export async function getGmailClient(userId: string) {
           : account.expires_at,
       })
       .where(
-        and(eq(accounts.userId, userId), eq(accounts.provider, "google"))
+        and(
+          eq(accounts.provider, "google"),
+          eq(accounts.providerAccountId, account.providerAccountId)
+        )
       );
   }
 
   const gmail = google.gmail({ version: "v1", auth: oauth2Client });
   return gmail;
+}
+
+// ─── All clients (primary + linked) ────────────────────────────────
+
+export async function getAllGmailClients(
+  userId: string
+): Promise<GmailAccount[]> {
+  const db = createDb();
+  const clients: GmailAccount[] = [];
+
+  // 1. Primary account from NextAuth
+  const [primaryAccount] = await db
+    .select()
+    .from(accounts)
+    .where(and(eq(accounts.userId, userId), eq(accounts.provider, "google")));
+
+  if (primaryAccount?.access_token && primaryAccount?.refresh_token) {
+    const oauth2Client = new OAuth2Client(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET
+    );
+
+    oauth2Client.setCredentials({
+      access_token: primaryAccount.access_token,
+      refresh_token: primaryAccount.refresh_token,
+    });
+
+    const isExpired =
+      primaryAccount.expires_at &&
+      primaryAccount.expires_at * 1000 < Date.now();
+
+    if (isExpired) {
+      const { credentials } = await oauth2Client.refreshAccessToken();
+      oauth2Client.setCredentials(credentials);
+
+      await db
+        .update(accounts)
+        .set({
+          access_token:
+            credentials.access_token ?? primaryAccount.access_token,
+          expires_at: credentials.expiry_date
+            ? Math.floor(credentials.expiry_date / 1000)
+            : primaryAccount.expires_at,
+        })
+        .where(
+          and(
+            eq(accounts.provider, "google"),
+            eq(
+              accounts.providerAccountId,
+              primaryAccount.providerAccountId
+            )
+          )
+        );
+    }
+
+    clients.push({
+      gmail: google.gmail({ version: "v1", auth: oauth2Client }),
+      email: "primary",
+      source: "primary",
+    });
+  }
+
+  // 2. Linked accounts
+  const linked = await db
+    .select()
+    .from(linkedAccounts)
+    .where(eq(linkedAccounts.userId, userId));
+
+  for (const la of linked) {
+    if (!la.accessToken || !la.refreshToken) continue;
+
+    const oauth2Client = new OAuth2Client(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET
+    );
+
+    oauth2Client.setCredentials({
+      access_token: la.accessToken,
+      refresh_token: la.refreshToken,
+    });
+
+    const isExpired = la.expiresAt && la.expiresAt * 1000 < Date.now();
+
+    if (isExpired) {
+      try {
+        const { credentials } = await oauth2Client.refreshAccessToken();
+        oauth2Client.setCredentials(credentials);
+
+        await db
+          .update(linkedAccounts)
+          .set({
+            accessToken: credentials.access_token ?? la.accessToken,
+            expiresAt: credentials.expiry_date
+              ? Math.floor(credentials.expiry_date / 1000)
+              : la.expiresAt,
+          })
+          .where(eq(linkedAccounts.id, la.id));
+      } catch {
+        // Token refresh failed — skip this linked account
+        continue;
+      }
+    }
+
+    clients.push({
+      gmail: google.gmail({ version: "v1", auth: oauth2Client }),
+      email: la.email,
+      source: "linked",
+    });
+  }
+
+  return clients;
 }
 
 // ─── Search messages with pagination ────────────────────────────────

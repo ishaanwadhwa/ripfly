@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { CopyButton } from "@/components/copy-button";
 import { ClaimStatus } from "@/components/claim-status";
@@ -196,10 +197,20 @@ export default async function FlightDetailPage({
                 </div>
               </div>
 
-              {/* Copy buttons */}
+              {/* Copy buttons + email link */}
               <div className="flex gap-2 mt-4">
                 <CopyButton text={flight.pnr} label="PNR" />
                 {lastName && <CopyButton text={lastName} label="Last Name" />}
+                {flight.emailMessageId && (
+                  <a
+                    href={`https://mail.google.com/mail/u/0/#inbox/${flight.emailMessageId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                  >
+                    View Email
+                  </a>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -299,6 +310,7 @@ export default async function FlightDetailPage({
                       claimId={claim?.id ?? null}
                       currentStatus={claim?.status ?? null}
                       flightId={flight.id}
+                      rejectionReason={claim?.rejectionReason}
                     />
                   </div>
                 </>
